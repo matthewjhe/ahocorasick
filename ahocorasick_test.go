@@ -31,9 +31,9 @@ func TestNoData(t *testing.T) {
 }
 
 func TestEarlyQuick(t *testing.T) {
-	hits := make([]int32, 0)
+	hits := make([]uint32, 0)
 	m := NewStringMatcher([]string{"Superman", "uperman", "perman", "erman"})
-	m.MatchN([]byte("The Man Of Steel: Superman"), func(hit int32) bool {
+	m.MatchN([]byte("The Man Of Steel: Superman"), func(hit uint32) bool {
 		if len(hits) > 1 {
 			return true
 		}
@@ -44,9 +44,9 @@ func TestEarlyQuick(t *testing.T) {
 	assert(t, hits[0] == 0)
 	assert(t, hits[1] == 1)
 
-	hits = make([]int32, 0)
+	hits = make([]uint32, 0)
 	m = NewStringMatcher([]string{"Steel", "tee", "e"})
-	m.MatchN([]byte("The Man Of Steel: Superman"), func(hit int32) bool {
+	m.MatchN([]byte("The Man Of Steel: Superman"), func(hit uint32) bool {
 		if len(hits) > 1 {
 			return true
 		}

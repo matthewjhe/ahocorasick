@@ -18,17 +18,17 @@ import (
 
 const (
 	// Root is the root node index
-	Root int32 = 0
+	Root uint32 = 0
 )
 
 // A node in the trie structure used to implement Aho-Corasick
 type node struct {
-	output   bool       // true when this node is leaf
-	fail     int32      // fallback index when a match fails
-	suffix   int32      // index of longest possible strict suffix of this node
-	value    int32      // index of original dictionary
-	children [256]int32 // child node indexes.
-	b        []byte     // the blice at this node, used in trie building process.
+	output   bool        // true when this node is leaf
+	fail     uint32      // fallback index when a match fails
+	suffix   uint32      // index of longest possible strict suffix of this node
+	value    uint32      // index of original dictionary
+	children [256]uint32 // child node indexes.
+	b        []byte      // the blice at this node, used in trie building process.
 }
 
 // Matcher is returned by NewMatcher and contains a list of blices to
@@ -41,9 +41,9 @@ type Matcher struct {
 // findBlice looks for a blice in the trie starting from the root and
 // returns the index to the node representing the end of the blice. If
 // the blice is not found it returns 0.
-func (m *Matcher) findBlice(b []byte) int32 {
+func (m *Matcher) findBlice(b []byte) uint32 {
 	n := m.nodes[0]
-	var i int32
+	var i uint32
 	for len(b) > 0 {
 		i = n.children[b[0]]
 		if i == 0 {
@@ -57,8 +57,8 @@ func (m *Matcher) findBlice(b []byte) int32 {
 
 // add adds a single word into trie.
 func (m *Matcher) add(word []byte, index int) {
-	var n int32
-	var i int32
+	var n uint32
+	var i uint32
 	for j, b := range word {
 		i = m.nodes[n].children[b]
 		if i != 0 {
@@ -69,15 +69,15 @@ func (m *Matcher) add(word []byte, index int) {
 		m.nodes = append(m.nodes, node{
 			b: word[:j+1],
 		})
-		c := int32(len(m.nodes) - 1)
+		c := uint32(len(m.nodes) - 1)
 		m.nodes[n].children[b] = c
 		n = c
 	}
 	m.nodes[n].output = true
-	m.nodes[n].value = int32(index)
+	m.nodes[n].value = uint32(index)
 }
 
-func (m *Matcher) walk(i int32, wf func(int32)) {
+func (m *Matcher) walk(i uint32, wf func(uint32)) {
 	for _, c := range m.nodes[i].children {
 		if c == 0 {
 			continue
@@ -100,7 +100,7 @@ func (m *Matcher) build() {
 			return bitset.New(uint(l))
 		},
 	}
-	m.walk(0, func(c int32) {
+	m.walk(0, func(c uint32) {
 		b := m.nodes[c].b
 		for j := 1; j < len(b); j++ {
 			fail := m.findBlice(b[j:])
@@ -153,8 +153,8 @@ func NewStringMatcher(dictionary []string) *Matcher {
 // MatchN searches in for blices and calls fn when indexes found.
 // It aborts the search when fn returns true.
 // MatchN is safe to call concurrently.
-func (m *Matcher) MatchN(in []byte, fn func(hit int32) bool) {
-	var n int32
+func (m *Matcher) MatchN(in []byte, fn func(hit uint32) bool) {
+	var n uint32
 	si := m.state.Get()
 	state, _ := si.(*bitset.BitSet)
 	for _, b := range in {
@@ -201,9 +201,9 @@ func (m *Matcher) MatchN(in []byte, fn func(hit int32) bool) {
 // Match searches in for blices and returns all the blices found as
 // indexes into the original dictionary
 // Match is safe to call concurrently.
-func (m *Matcher) Match(in []byte) []int32 {
-	var hits = make([]int32, 0, len(m.nodes))
-	m.MatchN(in, func(hit int32) bool {
+func (m *Matcher) Match(in []byte) []uint32 {
+	var hits = make([]uint32, 0, len(m.nodes))
+	m.MatchN(in, func(hit uint32) bool {
 		hits = append(hits, hit)
 		return false
 	})

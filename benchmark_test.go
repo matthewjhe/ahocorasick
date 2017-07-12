@@ -42,6 +42,6 @@ func TestMain(m *testing.M) {
 func BenchmarkEN(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		matcher.MatchN(content, func(int32) bool { return false })
+		matcher.MatchN(content, func(uint32) bool { return false })
 	}
 }
