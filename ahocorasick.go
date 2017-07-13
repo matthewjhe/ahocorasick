@@ -12,8 +12,6 @@ package ahocorasick
 import (
 	"runtime"
 	"sync"
-
-	"github.com/willf/bitset"
 )
 
 const (
@@ -23,7 +21,7 @@ const (
 
 // A node in the trie structure used to implement Aho-Corasick
 type node struct {
-	output   bool        // true when this node is leaf
+	output   bool        // true when this node is end of a word
 	fail     uint32      // fallback index when a match fails
 	suffix   uint32      // index of longest possible strict suffix of this node
 	value    uint32      // index of original dictionary
@@ -43,12 +41,11 @@ type Matcher struct {
 // the blice is not found it returns 0.
 func (m *Matcher) findBlice(b []byte) uint32 {
 	n := m.nodes[0]
-	var i uint32
-	for len(b) > 0 {
+	var i uint32 = n.children[b[0]]
+	n = m.nodes[i]
+	b = b[1:]
+	for i != Root && len(b) > 0 {
 		i = n.children[b[0]]
-		if i == 0 {
-			break
-		}
 		n = m.nodes[i]
 		b = b[1:]
 	}
@@ -61,17 +58,15 @@ func (m *Matcher) add(word []byte, index int) {
 	var i uint32
 	for j, b := range word {
 		i = m.nodes[n].children[b]
-		if i != 0 {
-			n = i
-			continue
+		if i == Root {
+			m.nodes = append(m.nodes, node{
+				b: word[:j+1],
+			})
+			c := uint32(len(m.nodes) - 1)
+			m.nodes[n].children[b] = c
+			i = c
 		}
-
-		m.nodes = append(m.nodes, node{
-			b: word[:j+1],
-		})
-		c := uint32(len(m.nodes) - 1)
-		m.nodes[n].children[b] = c
-		n = c
+		n = i
 	}
 	m.nodes[n].output = true
 	m.nodes[n].value = uint32(index)
@@ -79,7 +74,7 @@ func (m *Matcher) add(word []byte, index int) {
 
 func (m *Matcher) walk(i uint32, wf func(uint32)) {
 	for _, c := range m.nodes[i].children {
-		if c == 0 {
+		if c == Root {
 			continue
 		}
 		wf(c)
@@ -89,29 +84,24 @@ func (m *Matcher) walk(i uint32, wf func(uint32)) {
 
 func (m *Matcher) build() {
 	l := len(m.nodes)
-	nodes := make([]node, l, l)
-	for i, node := range m.nodes {
-		nodes[i] = node
-	}
-	m.nodes = nodes
+	m.nodes = append([]node{}, m.nodes[:l]...)
 	runtime.GC()
 	m.state = &sync.Pool{
 		New: func() interface{} {
-			return bitset.New(uint(l))
+			return make([]uint64, (l+63)>>6)
 		},
 	}
-	m.walk(0, func(c uint32) {
+	m.walk(Root, func(c uint32) {
 		b := m.nodes[c].b
 		for j := 1; j < len(b); j++ {
 			fail := m.findBlice(b[j:])
-			if fail == 0 {
-				continue
+			if fail != Root {
+				m.nodes[c].fail = fail
+				if m.nodes[fail].output {
+					m.nodes[c].suffix = fail
+				}
+				break
 			}
-			m.nodes[c].fail = fail
-			if m.nodes[fail].output {
-				m.nodes[c].suffix = fail
-			}
-			break
 		}
 		m.nodes[c].b = nil
 	})
@@ -119,11 +109,11 @@ func (m *Matcher) build() {
 
 func newMatcher(init int) *Matcher {
 	m := new(Matcher)
-	if init > 0 {
-		m.nodes = make([]node, 1, init)
-	} else {
-		m.nodes = make([]node, 1)
+	if init == 0 {
+		init = 1
 	}
+	init *= 12
+	m.nodes = make([]node, 1, init)
 	m.nodes[0] = node{}
 	return m
 }
@@ -156,45 +146,50 @@ func NewStringMatcher(dictionary []string) *Matcher {
 func (m *Matcher) MatchN(in []byte, fn func(hit uint32) bool) {
 	var n uint32
 	si := m.state.Get()
-	state, _ := si.(*bitset.BitSet)
+	state, _ := si.([]uint64)
+	_ = state[((len(m.nodes)+63)>>6)-1]
 	for _, b := range in {
-		for n != Root && m.nodes[n].children[b] == Root {
+		for m.nodes[n].children[b] == Root && n != Root {
 			n = m.nodes[n].fail
 		}
 
 		i := m.nodes[n].children[b]
 		if i != Root {
 			n = i
-			un := uint(n)
-			if m.nodes[n].output && !state.Test(un) {
+			if m.nodes[n].output && state[n>>6]&(1<<(n&63)) == 0 {
 				if fn(m.nodes[n].value) {
-					state.ClearAll()
+					for ii := range state {
+						state[ii] = 0
+					}
 					m.state.Put(si)
 					return
 				}
-				state.Set(un)
+				state[n>>6] |= 1 << (n & 63)
 			}
 
 			s := m.nodes[n].suffix
 			for s != Root {
-				us := uint(s)
-				if state.Test(us) {
+				if state[s>>6]&(1<<(s&63)) != 0 {
 					// There's no point working our way up the
 					// suffixes if it's been done before for this call
 					// to Match. The matches are already in hits.
 					break
 				}
 				if fn(m.nodes[s].value) {
-					state.ClearAll()
-					m.state.Put(state)
+					for ii := range state {
+						state[ii] = 0
+					}
+					m.state.Put(si)
 					return
 				}
-				state.Set(us)
+				state[s>>6] |= 1 << (s & 63)
 				s = m.nodes[s].suffix
 			}
 		}
 	}
-	state.ClearAll()
+	for ii := range state {
+		state[ii] = 0
+	}
 	m.state.Put(si)
 }
 

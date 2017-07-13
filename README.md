@@ -16,3 +16,8 @@ A Golang implementation of the Aho-Corasick string matching algorithm
 The testdata was borrowed from [anknown/ahocorasick](https://github.com/anknown/ahocorasick).
 
 BTW, in my benchmarks cloudflare's code is more efficient than anknown's in matching phase.
+
+**Credits**
+
+[BitSet](https://github.com/willf/bitset).
+[Ahocorasick](https://github.com/cloudflare/ahocorasick).
