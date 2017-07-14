@@ -39,9 +39,9 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func BenchmarkEN(b *testing.B) {
+func BenchmarkLarge(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		matcher.MatchN(content, func(uint32) bool { return false })
+		matcher.Match(content)
 	}
 }
