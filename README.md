@@ -86,5 +86,5 @@ BTW, in my benchmarks cloudflare's code is more efficient than anknown's in matc
 
 **Credits**
 
-[BitSet](https://github.com/willf/bitset).
-[Ahocorasick](https://github.com/cloudflare/ahocorasick).
+- [BitSet](https://github.com/willf/bitset).
+- [Ahocorasick](https://github.com/cloudflare/ahocorasick).
