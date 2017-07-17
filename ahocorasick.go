@@ -22,15 +22,15 @@ const (
 // Matcher is returned by NewMatcher and contains a list of blices to
 // match against
 type Matcher struct {
-	fails    []uint32
+	outputs  []bool
 	indexes  [][]uint32
 	children [][256]uint32
-	state    *sync.Pool
 
-	temp     [][]byte
-	suffixes []uint32
+	words [][]byte
 
 	nodes int
+	out   *sync.Pool
+	state *sync.Pool
 }
 
 // findBlice looks for a blice in the trie starting from the root and
@@ -55,11 +55,10 @@ func (m *Matcher) add(word []byte, index int) {
 	for j, b := range word {
 		i = m.children[n][b]
 		if i == Root {
-			m.fails = append(m.fails, 0)
 			m.indexes = append(m.indexes, []uint32{})
-			m.temp = append(m.temp, word[:j+1])
+			m.words = append(m.words, word[:j+1])
 			m.children = append(m.children, [256]uint32{})
-			c := uint32(len(m.fails) - 1)
+			c := uint32(len(m.words) - 1)
 			m.children[n][b] = c
 			i = c
 		}
@@ -70,40 +69,66 @@ func (m *Matcher) add(word []byte, index int) {
 }
 
 func (m *Matcher) build() {
-	l := len(m.fails)
-	m.fails = append([]uint32{}, m.fails[:l]...)
-	m.children = append([][256]uint32{}, m.children[:l]...)
+	l := len(m.words)
+	m.children = append([][256]uint32{}, m.children...)
+	m.out = &sync.Pool{
+		New: func() interface{} {
+			return make([]bool, l)
+		},
+	}
 	m.state = &sync.Pool{
 		New: func() interface{} {
-			return make([]uint64, (l+63)>>6)
+			return make([]uint64, (m.nodes+63)>>6)
 		},
 	}
 
-	m.suffixes = make([]uint32, l, l)
-	for n, b := range m.temp[1:] {
+	fails := make([]uint32, l, l)
+	suffixes := make([]uint32, l, l)
+	for n, b := range m.words[1:] {
 		c := n + 1
 		for j := 1; j < len(b); j++ {
 			fail := m.findBlice(b[j:])
 			if fail != Root {
-				m.fails[c] = fail
+				fails[c] = fail
 				if len(m.indexes[fail]) > 0 {
-					m.suffixes[c] = fail
+					suffixes[c] = fail
 				}
 				break
 			}
 		}
 	}
+
+	m.outputs = make([]bool, l)
 	for n := range m.indexes[1:] {
 		c := n + 1
-		i := m.suffixes[c]
+		i := suffixes[c]
 		for i != Root {
 			m.indexes[c] = append(m.indexes[c], m.indexes[i][0])
-			i = m.suffixes[i]
+			i = suffixes[i]
+		}
+		if len(m.indexes[c]) > 0 {
+			m.outputs[c] = true
 		}
 	}
-	m.indexes = append([][]uint32{}, m.indexes[:l]...)
-	m.temp = nil
-	m.suffixes = nil
+	m.indexes = append([][]uint32{}, m.indexes...)
+
+	for i := uint32(1); i < uint32(l); i++ {
+		for b := uint32(0); b < 256; b++ {
+			n := i
+			if m.children[i][b] == Root {
+				for n != Root && m.children[n][b] == Root {
+					n = fails[n]
+				}
+				if n != Root {
+					m.children[i][b] = n + 1
+				}
+			}
+		}
+	}
+
+	fails = nil
+	suffixes = nil
+	m.words = nil
 	runtime.GC()
 }
 
@@ -113,8 +138,7 @@ func newMatcher(init int) *Matcher {
 		init = 1
 	}
 	init *= 12
-	m.fails = make([]uint32, 1, init)
-	m.temp = make([][]byte, 1, init)
+	m.words = make([][]byte, 1, init)
 	m.indexes = make([][]uint32, 1, init)
 	m.children = make([][256]uint32, 1, init)
 	return m
@@ -142,53 +166,42 @@ func NewStringMatcher(dictionary []string) *Matcher {
 	return m
 }
 
-// MatchN searches in for blices and stops when N indexes found.
-// MatchN is safe to call concurrently.
-func (m *Matcher) MatchN(in []byte, N int) []uint32 {
-	var (
-		c        int
-		n        uint32
-		si       = m.state.Get()
-		state, _ = si.([]uint64)
-		hits     = make([]uint32, 0, N/4)
-	)
-	for _, b := range in {
-		for n != Root && m.children[n][b] == Root {
-			n = m.fails[n]
-		}
-
-		i := m.children[n][b]
-		if i != Root {
-			n = i
-			for _, index := range m.indexes[n] {
-				s := uint32(index)
-				if state[s>>6]&(1<<(s&63)) != 0 {
-					break
-				}
-				state[s>>6] |= 1 << (s & 63)
-				hits = append(hits, index)
-				c++
-				if c == N {
-					for ii := range state {
-						state[ii] = 0
-					}
-					m.state.Put(si)
-					return hits
-				}
-			}
-		}
-	}
-
-	for ii := range state {
-		state[ii] = 0
-	}
-	m.state.Put(si)
-	return hits
-}
-
 // Match searches in for blices and returns all the blices found as
 // indexes into the original dictionary
 // Match is safe to call concurrently.
 func (m *Matcher) Match(in []byte) []uint32 {
-	return m.MatchN(in, m.nodes)
+	n := uint32(0)
+	oi := m.out.Get()
+	out, _ := oi.([]bool)
+	for _, b := range in {
+		n = m.children[n][b]
+		out[n] = m.outputs[n]
+	}
+
+	si := m.state.Get()
+	state, _ := si.([]uint64)
+	hits := make([]uint32, 0, m.nodes/4)
+	for n, v := range out {
+		if v {
+			for _, s := range m.indexes[n] {
+				ii := s >> 6
+				ss := uint64(1 << (s & 63))
+				if state[ii]&ss != 0 {
+					break
+				}
+				hits = append(hits, s)
+				state[ii] |= ss
+			}
+		}
+	}
+
+	for ii := range out {
+		out[ii] = false
+	}
+	for ii := range state {
+		state[ii] = 0
+	}
+	m.out.Put(oi)
+	m.state.Put(si)
+	return hits
 }

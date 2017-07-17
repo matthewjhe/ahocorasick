@@ -30,20 +30,6 @@ func TestNoData(t *testing.T) {
 	assert(t, len(hits) == 0)
 }
 
-func TestEarlyQuick(t *testing.T) {
-	m := NewStringMatcher([]string{"Superman", "uperman", "perman", "erman"})
-	hits := m.MatchN([]byte("The Man Of Steel: Superman"), 2)
-	assert(t, len(hits) == 2)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 1)
-
-	m = NewStringMatcher([]string{"Steel", "tee", "e"})
-	hits = m.MatchN([]byte("The Man Of Steel: Superman"), 2)
-	assert(t, len(hits) == 2)
-	assert(t, hits[0] == 2)
-	assert(t, hits[1] == 1)
-}
-
 func TestSuffixes(t *testing.T) {
 	m := NewStringMatcher([]string{"Superman", "uperman", "perman", "erman"})
 	hits := m.Match([]byte("The Man Of Steel: Superman"))
@@ -68,9 +54,9 @@ func TestInterior(t *testing.T) {
 	m := NewStringMatcher([]string{"Steel", "tee", "e"})
 	hits := m.Match([]byte("The Man Of Steel: Superman"))
 	assert(t, len(hits) == 3)
+	assert(t, hits[0] == 1)
+	assert(t, hits[1] == 2)
 	assert(t, hits[2] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[0] == 2)
 }
 
 func TestMatchAtStart(t *testing.T) {
@@ -104,17 +90,17 @@ func TestMultipleMatches(t *testing.T) {
 	m := NewStringMatcher([]string{"The", "Man", "an"})
 	hits := m.Match([]byte("A Man A Plan A Canal: Panama, which Man Planned The Canal"))
 	assert(t, len(hits) == 3)
-	assert(t, hits[0] == 1)
-	assert(t, hits[1] == 2)
-	assert(t, hits[2] == 0)
+	assert(t, hits[0] == 0)
+	assert(t, hits[1] == 1)
+	assert(t, hits[2] == 2)
 }
 
 func TestSingleCharacterMatches(t *testing.T) {
 	m := NewStringMatcher([]string{"a", "M", "z"})
 	hits := m.Match([]byte("A Man A Plan A Canal: Panama, which Man Planned The Canal"))
 	assert(t, len(hits) == 2)
-	assert(t, hits[0] == 1)
-	assert(t, hits[1] == 0)
+	assert(t, hits[0] == 0)
+	assert(t, hits[1] == 1)
 }
 
 func TestNothingMatches(t *testing.T) {
@@ -134,10 +120,10 @@ func TestWikipedia(t *testing.T) {
 
 	hits = m.Match([]byte("bccabd"))
 	assert(t, len(hits) == 4)
-	assert(t, hits[0] == 2)
-	assert(t, hits[1] == 4)
-	assert(t, hits[2] == 0)
-	assert(t, hits[3] == 1)
+	assert(t, hits[0] == 0)
+	assert(t, hits[1] == 1)
+	assert(t, hits[2] == 2)
+	assert(t, hits[3] == 4)
 
 	hits = m.Match([]byte("bccb"))
 	assert(t, len(hits) == 2)

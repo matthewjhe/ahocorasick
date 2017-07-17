@@ -35,7 +35,9 @@ func initData() {
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	initData()
+	if *d != "" {
+		initData()
+	}
 	os.Exit(m.Run())
 }
 
