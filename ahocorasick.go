@@ -24,6 +24,7 @@ const (
 type Matcher struct {
 	outputs  []bool
 	indexes  [][]uint32
+	outonly  []uint32
 	children [][256]uint32
 
 	words [][]byte
@@ -99,6 +100,7 @@ func (m *Matcher) build() {
 	}
 
 	m.outputs = make([]bool, l)
+	m.outonly = make([]uint32, 0, m.nodes)
 	for n := range m.indexes[1:] {
 		c := n + 1
 		i := suffixes[c]
@@ -108,6 +110,7 @@ func (m *Matcher) build() {
 		}
 		if len(m.indexes[c]) > 0 {
 			m.outputs[c] = true
+			m.outonly = append(m.outonly, uint32(c))
 		}
 	}
 	m.indexes = append([][]uint32{}, m.indexes...)
@@ -180,9 +183,9 @@ func (m *Matcher) Match(in []byte) []uint32 {
 
 	si := m.state.Get()
 	state, _ := si.([]uint64)
-	hits := make([]uint32, 0, m.nodes/4)
-	for n, v := range out {
-		if v {
+	hits := make([]uint32, 0, m.nodes)
+	for _, n := range m.outonly {
+		if out[n] {
 			for _, s := range m.indexes[n] {
 				ii := s >> 6
 				ss := uint64(1 << (s & 63))
