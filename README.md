@@ -21,7 +21,7 @@ A Golang implementation of the Aho-Corasick string matching algorithm
     BenchmarkMatchMany-4          457           694           +51.86%
     BenchmarkLongMatchMany-4      4294          4746          +10.53%
     BenchmarkMatchLarge-4         78099990      44876047      -42.54%
-    BenchmarkMatchLargeP-4        17978602      12413427      -30.95%
+    BenchmarkMatchLargeP-4        77152131      12082461      -84.34%
     
     benchmark                     old allocs     new allocs     delta
     BenchmarkMatchWorks-4         3              1              -66.67%
@@ -31,7 +31,7 @@ A Golang implementation of the Aho-Corasick string matching algorithm
     BenchmarkMatchMany-4          3              1              -66.67%
     BenchmarkLongMatchMany-4      6              1              -83.33%
     BenchmarkMatchLarge-4         24             1              -95.83%
-    BenchmarkMatchLargeP-4        21             1              -95.24%
+    BenchmarkMatchLargeP-4        24             1              -95.83%
     
     benchmark                     old bytes     new bytes     delta
     BenchmarkMatchWorks-4         56            32            -42.86%
@@ -42,6 +42,7 @@ A Golang implementation of the Aho-Corasick string matching algorithm
     BenchmarkLongMatchMany-4      504           128           -74.60%
     BenchmarkMatchLarge-4         1107192       518575        -53.16%
     BenchmarkMatchLargeP-4        676948        520575        -23.10%
+    BenchmarkMatchLargeP-4        1107207       520279        -53.01%
 ```
 
 **Note**
