@@ -120,10 +120,10 @@ func TestWikipedia(t *testing.T) {
 
 	hits = m.Match([]byte("bccabd"))
 	assert(t, len(hits) == 4)
-	assert(t, hits[0] == 0)
-	assert(t, hits[1] == 1)
-	assert(t, hits[2] == 2)
-	assert(t, hits[3] == 4)
+	assert(t, hits[0] == 1)
+	assert(t, hits[1] == 2)
+	assert(t, hits[2] == 4)
+	assert(t, hits[3] == 0)
 
 	hits = m.Match([]byte("bccb"))
 	assert(t, len(hits) == 2)

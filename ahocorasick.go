@@ -19,13 +19,22 @@ const (
 	Root uint32 = 0
 )
 
+func split(r []byte) []byte {
+	var dst = make([]byte, len(r)*2)
+	for i, v := range r {
+		dst[i*2] = v >> 4
+		dst[i*2+1] = v & 0x0f
+	}
+	return dst
+}
+
 // Matcher is returned by NewMatcher and contains a list of blices to
 // match against
 type Matcher struct {
 	outputs  []bool
 	indexes  [][]uint32
 	outonly  []uint32
-	children [][256]uint32
+	children [][16]uint32
 
 	words [][]byte
 
@@ -37,14 +46,14 @@ type Matcher struct {
 // findBlice looks for a blice in the trie starting from the root and
 // returns the index to the node representing the end of the blice. If
 // the blice is not found it returns 0.
-func (m *Matcher) findBlice(b []byte) uint32 {
+func (m *Matcher) findBlice(word []byte) uint32 {
 	var n uint32
-	for len(b) > 0 {
-		n = m.children[n][b[0]]
+	for len(word) > 0 {
+		n = m.children[n][word[0]]
 		if n == Root {
 			break
 		}
-		b = b[1:]
+		word = word[1:]
 	}
 	return n
 }
@@ -53,12 +62,13 @@ func (m *Matcher) findBlice(b []byte) uint32 {
 func (m *Matcher) add(word []byte, index int) {
 	var n uint32
 	var i uint32
+	word = split(word)
 	for j, b := range word {
 		i = m.children[n][b]
 		if i == Root {
 			m.indexes = append(m.indexes, []uint32{})
 			m.words = append(m.words, word[:j+1])
-			m.children = append(m.children, [256]uint32{})
+			m.children = append(m.children, [16]uint32{})
 			c := uint32(len(m.words) - 1)
 			m.children[n][b] = c
 			i = c
@@ -71,7 +81,7 @@ func (m *Matcher) add(word []byte, index int) {
 
 func (m *Matcher) build() {
 	l := len(m.words)
-	m.children = append([][256]uint32{}, m.children...)
+	m.children = append([][16]uint32{}, m.children...)
 	m.out = &sync.Pool{
 		New: func() interface{} {
 			return make([]bool, l)
@@ -87,7 +97,7 @@ func (m *Matcher) build() {
 	suffixes := make([]uint32, l, l)
 	for n, b := range m.words[1:] {
 		c := n + 1
-		for j := 1; j < len(b); j++ {
+		for j := 2; j < len(b); j++ {
 			fail := m.findBlice(b[j:])
 			if fail != Root {
 				fails[c] = fail
@@ -116,14 +126,14 @@ func (m *Matcher) build() {
 	m.indexes = append([][]uint32{}, m.indexes...)
 
 	for i := uint32(1); i < uint32(l); i++ {
-		for b := uint32(0); b < 256; b++ {
+		for b := uint32(0); b < 16; b++ {
 			n := i
 			if m.children[i][b] == Root {
 				for n != Root && m.children[n][b] == Root {
 					n = fails[n]
 				}
 				if n != Root {
-					m.children[i][b] = n + 1
+					m.children[i][b] = m.children[n][b]
 				}
 			}
 		}
@@ -143,7 +153,7 @@ func newMatcher(init int) *Matcher {
 	init *= 12
 	m.words = make([][]byte, 1, init)
 	m.indexes = make([][]uint32, 1, init)
-	m.children = make([][256]uint32, 1, init)
+	m.children = make([][16]uint32, 1, init)
 	return m
 }
 
@@ -177,7 +187,10 @@ func (m *Matcher) Match(in []byte) []uint32 {
 	oi := m.out.Get()
 	out, _ := oi.([]bool)
 	for _, b := range in {
-		n = m.children[n][b]
+		l := b >> 4
+		r := b & 0x0f
+		n = m.children[n][l]
+		n = m.children[n][r]
 		out[n] = m.outputs[n]
 	}
 

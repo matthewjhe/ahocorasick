@@ -44,9 +44,7 @@ func TestMain(m *testing.M) {
 func BenchmarkLarge(b *testing.B) {
 	b.SetBytes(int64(len(content)))
 	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			matcher.Match(content)
-		}
-	})
+	for i := 0; i < b.N; i++ {
+		matcher.Match(content)
+	}
 }
