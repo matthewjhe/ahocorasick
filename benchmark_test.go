@@ -1,5 +1,3 @@
-// +build large_dict
-
 package ahocorasick
 
 import (
@@ -41,10 +39,18 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func BenchmarkLarge(b *testing.B) {
-	b.SetBytes(int64(len(content)))
+func BenchmarkMatchLarge(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		matcher.Match(content)
 	}
+}
+
+func BenchmarkMatchLargeP(b *testing.B) {
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			matcher.Match(content)
+		}
+	})
 }

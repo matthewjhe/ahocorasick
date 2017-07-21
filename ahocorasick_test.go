@@ -1,5 +1,3 @@
-// +build !large_dict
-
 // ahocorasick_test.go: test suite for ahocorasick
 //
 // Copyright (c) 2013 CloudFlare, Inc.
